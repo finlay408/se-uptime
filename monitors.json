@@ -1,0 +1,23 @@
+{
+  "monitors": [
+    {
+      "id": "site",
+      "name": "Website",
+      "url": "https://soonerased.com",
+      "keyword": "Soon Erased"
+    },
+    {
+      "id": "gallery",
+      "name": "Gallery",
+      "url": "https://www.soonerased.com/gallery",
+      "keyword": "£"
+    },
+    {
+      "id": "os",
+      "name": "OS",
+      "url": "https://soon-erased-os.vercel.app/login",
+      "keyword": "Soon Erased OS"
+    }
+  ],
+  "domains": ["soonerased.com"]
+}

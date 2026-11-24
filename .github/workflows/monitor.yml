@@ -1,0 +1,67 @@
+name: Uptime
+
+on:
+  schedule:
+    # Every 5 minutes. GitHub runs scheduled jobs on a best-effort basis, so
+    # in practice gaps are sometimes 10-15 minutes at busy times.
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: uptime
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      # The monitor's memory (status, history, incidents) lives on the `data`
+      # branch as a single commit that is replaced every run, so the repo
+      # never grows.
+      - name: Load last state
+        run: |
+          mkdir -p data
+          if git fetch --depth=1 origin data 2>/dev/null; then
+            git archive FETCH_HEAD | tar -x -C data
+          fi
+
+      - name: Check the pages
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          STATUS_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/
+        run: node monitor.mjs
+
+      - name: Save state
+        if: always()
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          [ -f data/state.json ] || exit 0
+          remote="https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          publish=false; [ -f data/.publish ] && publish=true && rm data/.publish
+          cd data
+          git init -q -b data
+          git add -A
+          git -c user.name=se-uptime -c user.email=uptime@users.noreply.github.com commit -qm "state $(date -u +%FT%TZ)"
+          git push -qf "$remote" data
+          # The status page is republished when something changes, and at
+          # most every 30 minutes otherwise (GitHub Pages limits rebuilds).
+          if $publish; then
+            cd site
+            git init -q -b gh-pages
+            touch .nojekyll
+            git add -A
+            git -c user.name=se-uptime -c user.email=uptime@users.noreply.github.com commit -qm "status page"
+            git push -qf "$remote" gh-pages
+          fi
