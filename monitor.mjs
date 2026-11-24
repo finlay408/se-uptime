@@ -73,9 +73,11 @@ async function telegram(text) {
     });
     if (!res.ok) throw new Error(`HTTP ${res.status} ${await res.text()}`);
     console.log(`telegram sent: ${text.split("\n")[0]}`);
+    return true;
   } catch (e) {
     telegramFailed = true;
     console.error(`Telegram send failed: ${e.message}`);
+    return false;
   }
 }
 
@@ -265,10 +267,11 @@ if (state.lastExpiryCheck !== today) {
   }
 }
 
-// First run: say hello. After that: one summary each morning.
-if (firstRun) {
-  state.lastDigest = londonHour(now) >= DIGEST_HOUR ? today : null;
-  await telegram(`👋 <b>Soon Erased monitor is on</b>\nWatching ${config.monitors.map((m) => esc(m.name)).join(", ")} every 5 minutes. You'll get a message if one goes down, when it's back, and a short summary each morning.`);
+// First run: say hello (retried every run until it actually reaches Telegram).
+// After that: one summary each morning.
+if (firstRun) state.lastDigest = londonHour(now) >= DIGEST_HOUR ? today : null;
+if (!state.helloSent) {
+  state.helloSent = await telegram(`👋 <b>Soon Erased monitor is on</b>\nWatching ${config.monitors.map((m) => esc(m.name)).join(", ")} every 5 minutes. You'll get a message if one goes down, when it's back, and a short summary each morning.`);
 } else if (state.lastDigest !== today && londonHour(now) >= DIGEST_HOUR) {
   state.lastDigest = today;
   const dayAgo = now - 86400000;
